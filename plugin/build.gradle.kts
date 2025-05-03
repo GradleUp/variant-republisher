@@ -9,7 +9,7 @@ plugins { // Apply the Java Gradle plugin development plugin to add support for 
     embeddedKotlin("jvm")
 }
 
-version = "0.0.8"
+version = "0.0.1"
 
 repositories { // Use Maven Central for resolving dependencies.
     mavenCentral()
@@ -18,7 +18,7 @@ repositories { // Use Maven Central for resolving dependencies.
 
 val gluegenDep = configurations.dependencyScope("jogampDep")
 
-val gluegenVersion = "2.4.0"
+val gluegenVersion = "2.5.0"
 dependencies {
     val libraries = listOf(
         "gluegen:gluegen-rt",
@@ -38,120 +38,122 @@ dependencies {
             gluegenDep("org.jogamp.$lib:$gluegenVersion:natives-$variant")
     gluegenDep("org.jogamp.${libraries[0]}:$gluegenVersion-rt")
 
-    implementation("org.xerial:sqlite-jdbc:3.45.1.0")
+//    implementation("org.xerial:sqlite-jdbc:3.45.1.0")
 }
-val gluegenRes = configurations.resolvable("jogampRes") {
-    extendsFrom(gluegenDep.get())
-}
-
-// remove antlr
-var files = gluegenRes.get().resolve().filter { "gluegen" in it.name }
-check(files.last().name == "gluegen-rt-$gluegenVersion.jar")
-val gluegen = files.last()
-println(gluegen)
-for (file in files)
-    println(file)
-files = files.dropLast(1)
-
-// Add a different runtime variant for each platform
-val javaComponent = components.findByName("java") as AdhocComponentWithVariants
-
-for (file in files) {
-    val classifier = file.name.substringAfter("natives-").substringBefore('.')
-    // Creation of the native jars
-    val nativeJar = tasks.register<Jar>("${classifier}Jar") {
-        archiveClassifier = classifier
-        from(file)
-        //            val md = MessageDigest.getInstance("SHA-1")
-        //            md.update(variantDefinition.lib.readBytes())
-        //            manifest.attributes["sha1"] = md.digest().joinToString("") { "%02x".format(it) }
-    }
-
-    fun String.normalized() = lowercase().replace("[^a-z0-9]+".toRegex(), "")
-    fun archOf(value: String): Arch {
-        val v = value.normalized()
-        return when {
-            v.matches(Regex("^(x8664|amd64|ia32e|em64t|x64)$")) -> Arch.x86_64
-            v.matches(Regex("^(x8632|x86|i[3-6]86|ia32|x32)$")) -> Arch.x86_32
-            v.matches(Regex("^(ia64w?|itanium64)$")) -> Arch.itanium_64
-            v == "ia64n" -> Arch.itanium_32
-            v.matches(Regex("^(sparc|sparc32)$")) -> Arch.sparc_32
-            v.matches(Regex("^(sparcv9|sparc64)$")) -> Arch.sparc_64
-            v.matches(Regex("^(arm|arm32)$")) || v == "armv6hf" -> Arch.arm_32
-            v == "aarch64" -> Arch.aarch_64
-            v.matches(Regex("^(mips|mips32)$")) -> Arch.mips_32
-            v.matches(Regex("^(mipsel|mips32el)$")) -> Arch.mipsel_32
-            v == "mips64" -> Arch.mips_64
-            v == "mips64el" -> Arch.mipsel_64
-            v.matches(Regex("^(ppc|ppc32)$")) -> Arch.ppc_32
-            v.matches(Regex("^(ppcle|ppc32le)$")) -> Arch.ppcle_32
-            v == "ppc64" -> Arch.ppc_64
-            v == "ppc64le" -> Arch.ppcle_64
-            v == "s390" -> Arch.s390_32
-            v == "s390x" -> Arch.s390_64
-            v.matches(Regex("^(riscv|riscv32)$")) -> Arch.riscv
-            v == Arch.riscv64.name -> Arch.riscv64
-            v == Arch.e2k.name -> Arch.e2k
-            v == "loongarch64" -> Arch.loongarch_64
-            v == Arch.universal.name -> Arch.universal
-            else -> error("invalid Arch: $v ($value)")
-        }
-    }
-
-    fun currentArch(): Arch = archOf(System.getProperty("os.arch"))
-    fun osOf(value: String): OS {
-        val v = value.normalized()
-        return when {
-            v == OS.android.name -> OS.android
-            v.startsWith(OS.aix.name) -> OS.aix
-            v.startsWith(OS.hpux.name) -> OS.hpux
-            // Avoid the names such as os4000
-            v.startsWith(OS.os400.name) && (v.length <= 5 || !v[5].isDigit()) -> OS.os400
-            v.startsWith(OS.linux.name) -> OS.linux
-            v.startsWith("mac") || v.startsWith(OS.osx.name) -> OS.osx
-            v.startsWith(OS.freebsd.name) -> OS.freebsd
-            v.startsWith(OS.openbsd.name) -> OS.openbsd
-            v.startsWith(OS.netbsd.name) -> OS.netbsd
-            v.startsWith("solaris") || v.startsWith(OS.sunos.name) -> OS.sunos
-            v.startsWith(OS.windows.name) -> OS.windows
-            v.startsWith(OS.zos.name) -> OS.zos
-            else -> error("invalid OS: $v ($value)")
-        }
-    }
-
-    fun currentOS(): OS = osOf(System.getProperty("os.name"))
-
-    val nativeRuntimeElements = configurations.consumable("${classifier}RuntimeElements") {
-        attributes {
-            attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME)) // this is also by default
-            attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY)) // this is also by default
-            attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling.EXTERNAL))
-            attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.JAR)) // this is also by default
-            val (o, a) = classifier.split("-")
-            println("$o, $a")
-            os = osOf(o)
-            arch = archOf(a)
-        }
-        outgoing {
-            //            artifact(gluegen)
-            artifact(nativeJar)
-        }
-        extendsFrom(configurations.runtimeElements.get())
-    }
-    javaComponent.addVariantsFromConfiguration(nativeRuntimeElements.get()) {}
-}
-
-configurations {
-    apiElements {
-        outgoing {
-            artifacts.clear()
-            artifact(gluegen)
-        }
-    }
-    runtimeElements {
-        outgoing.artifacts.clear()
-    }
-}
+//val gluegenRes = configurations.resolvable("jogampRes") {
+//    extendsFrom(gluegenDep.get())
+//}
+//
+//// remove antlr
+//var files = gluegenRes.get().resolve().filter { "gluegen" in it.name }
+//check(files.last().name == "gluegen-rt-$gluegenVersion.jar")
+//val gluegen = files.last()
+//println(gluegen)
+//for (file in files)
+//    println(file)
+//files = files.dropLast(1)
+//
+//// Add a different runtime variant for each platform
+//val javaComponent = components.findByName("java") as AdhocComponentWithVariants
+//
+//for (file in files) {
+//    val classifier = file.name.substringAfter("natives-").substringBefore('.')
+//    // Creation of the native jars
+//    val nativeJar = tasks.register<Jar>("${classifier}Jar") {
+//        archiveClassifier = classifier
+//        from(file)
+//        //            val md = MessageDigest.getInstance("SHA-1")
+//        //            md.update(variantDefinition.lib.readBytes())
+//        //            manifest.attributes["sha1"] = md.digest().joinToString("") { "%02x".format(it) }
+//    }
+//
+//    fun String.normalized() = lowercase().replace("[^a-z0-9]+".toRegex(), "")
+//    fun archOf(value: String): Arch {
+//        val v = value.normalized()
+//        return when {
+//            v.matches(Regex("^(x8664|amd64|ia32e|em64t|x64)$")) -> Arch.x86_64
+//            v.matches(Regex("^(x8632|x86|i[3-6]86|ia32|x32)$")) -> Arch.x86_32
+//            v.matches(Regex("^(ia64w?|itanium64)$")) -> Arch.itanium_64
+//            v == "ia64n" -> Arch.itanium_32
+//            v.matches(Regex("^(sparc|sparc32)$")) -> Arch.sparc_32
+//            v.matches(Regex("^(sparcv9|sparc64)$")) -> Arch.sparc_64
+//            v.matches(Regex("^(arm|arm32)$")) || v == "armv6hf" -> Arch.arm_32
+//            v == "aarch64" -> Arch.aarch_64
+//            v.matches(Regex("^(mips|mips32)$")) -> Arch.mips_32
+//            v.matches(Regex("^(mipsel|mips32el)$")) -> Arch.mipsel_32
+//            v == "mips64" -> Arch.mips_64
+//            v == "mips64el" -> Arch.mipsel_64
+//            v.matches(Regex("^(ppc|ppc32)$")) -> Arch.ppc_32
+//            v.matches(Regex("^(ppcle|ppc32le)$")) -> Arch.ppcle_32
+//            v == "ppc64" -> Arch.ppc_64
+//            v == "ppc64le" -> Arch.ppcle_64
+//            v == "s390" -> Arch.s390_32
+//            v == "s390x" -> Arch.s390_64
+//            v.matches(Regex("^(riscv|riscv32)$")) -> Arch.riscv
+//            v == Arch.riscv64.name -> Arch.riscv64
+//            v == Arch.e2k.name -> Arch.e2k
+//            v == "loongarch64" -> Arch.loongarch_64
+//            v == Arch.universal.name -> Arch.universal
+//            else -> error("invalid Arch: $v ($value)")
+//        }
+//    }
+//
+//    fun currentArch(): Arch = archOf(System.getProperty("os.arch"))
+//    fun osOf(value: String): OS {
+//        val v = value.normalized()
+//        return when {
+//            v == OS.android.name -> OS.android
+//            v.startsWith(OS.aix.name) -> OS.aix
+//            v.startsWith(OS.hpux.name) -> OS.hpux
+//            // Avoid the names such as os4000
+//            v.startsWith(OS.os400.name) && (v.length <= 5 || !v[5].isDigit()) -> OS.os400
+//            v.startsWith(OS.linux.name) -> OS.linux
+//            v.startsWith("mac") || v.startsWith(OS.osx.name) -> OS.osx
+//            v.startsWith(OS.freebsd.name) -> OS.freebsd
+//            v.startsWith(OS.openbsd.name) -> OS.openbsd
+//            v.startsWith(OS.netbsd.name) -> OS.netbsd
+//            v.startsWith("solaris") || v.startsWith(OS.sunos.name) -> OS.sunos
+//            v.startsWith(OS.windows.name) -> OS.windows
+//            v.startsWith(OS.zos.name) -> OS.zos
+//            else -> error("invalid OS: $v ($value)")
+//        }
+//    }
+//
+//    fun currentOS(): OS = osOf(System.getProperty("os.name"))
+//
+//    val nativeRuntimeElements = configurations.consumable("${classifier}RuntimeElements") {
+//        attributes {
+//            attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME)) // this is also by default
+//            attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY)) // this is also by default
+//            attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling.EXTERNAL))
+//            attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.JAR)) // this is also by default
+//            val (os, arch) = classifier.split("-")
+//            println("$os, $arch")
+//            attribute(OperatingSystemFamily.OPERATING_SYSTEM_ATTRIBUTE, objects.named(os))
+//            attribute(MachineArchitecture.ARCHITECTURE_ATTRIBUTE, objects.named(arch))
+////            os = osOf(o)
+////            arch = archOf(a)
+//        }
+//        outgoing {
+//            //            artifact(gluegen)
+//            artifact(nativeJar)
+//        }
+//        extendsFrom(configurations.runtimeElements.get())
+//    }
+////    javaComponent.addVariantsFromConfiguration(nativeRuntimeElements.get()) {}
+//}
+//
+//configurations {
+//    apiElements {
+//        outgoing {
+//            artifacts.clear()
+//            artifact(gluegen)
+//        }
+//    }
+//    runtimeElements {
+//        outgoing.artifacts.clear()
+//    }
+//}
 
 // don't publish the default runtime without native jar
 //javaComponent.withVariantsFromConfiguration(configurations.runtimeElements.get()) { skip() }
@@ -160,7 +162,7 @@ configurations {
 publishing {
     publications.create<MavenPublication>("maven") {
         from(components["java"])
-        groupId = "org.jogamp.gluegen"
+        groupId = "org.scijava"
         artifactId = "gluegen-rt"
         for (a in artifacts) {
             println(a.file)
