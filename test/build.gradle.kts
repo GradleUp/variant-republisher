@@ -1,5 +1,5 @@
 plugins {
-    id("gradleUp.variant-republisher")
+    id("io.github.gradleUp.variant-republisher")
 }
 
 republish {
@@ -17,7 +17,7 @@ republish {
         }
         into {
             group = "org.scijava"
-            repo = layout.buildDirectory.dir("repo")
+            directory = layout.buildDirectory.dir("repo")
         }
     }
     library {
@@ -28,7 +28,7 @@ republish {
         }
         into {
             group = "org.scijava"
-            repo = layout.buildDirectory.dir("repo")
+            directory = layout.buildDirectory.dir("repo")
         }
     }
 }

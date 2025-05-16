@@ -2,15 +2,14 @@
 
 
 import org.gradle.api.Action
+import org.gradle.api.artifacts.repositories.MavenArtifactRepository
 import org.gradle.api.model.ObjectFactory
-import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Internal
 import org.gradle.kotlin.dsl.domainObjectSet
 import org.gradle.kotlin.dsl.listProperty
 import org.gradle.kotlin.dsl.newInstance
 import org.gradle.kotlin.dsl.property
 import javax.inject.Inject
-import kotlin.collections.joinToString
 
 abstract class RepublishExtension {
 
@@ -64,7 +63,10 @@ abstract class Library {
         @get:Inject
         abstract val objects: ObjectFactory
 
-        val repo = objects.directoryProperty()
+        val directory = objects.directoryProperty()
+        val repository = objects.property<String>()
+        //        val maven = objects.newInstance<MavenArtifactRepository>()
+        //        fun maven(action: Action<in MavenArtifactRepository>) = action.execute(maven)
 
         val group = objects.property<String>()
             get() = field.takeIf { it.isPresent } ?: from.group
@@ -93,7 +95,7 @@ abstract class Library {
                     mavenCentral()""".trimIndent())
             if (from.repo.isPresent)
                 appendLine("""    maven("${from.repo.get()}")""")
-            append("""
+            appendLine("""
                 }
                 val libraryDep = configurations.dependencyScope("libraryDep")
                 val nativesDep = configurations.dependencyScope("nativesDep")
@@ -134,8 +136,14 @@ abstract class Library {
                         version = "${into.version.get()}"
                     }
                     repositories.maven {
-                        name = "repo"
-                        url = uri("${into.repo.get()}")
+                        name = "republisher"""".trimIndent())
+            if (into.directory.isPresent)
+                appendLine("""        url = uri("${into.directory.get()}")""")
+            else
+                appendLine("""
+               |        credentials(PasswordCredentials::class)
+               |        url = uri("${into.repository.get()}")""".trimMargin())
+            appendLine("""    
                     }
                 }
                 tasks.named<GenerateModuleMetadata>("generateMetadataFileForMavenPublication") {

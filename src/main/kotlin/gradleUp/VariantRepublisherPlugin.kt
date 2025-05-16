@@ -30,7 +30,7 @@ class VariantRepublisherPlugin : Plugin<Project> {
                     val runner = GradleRunner.create()
                     runner.forwardOutput()
                     //                runner.withPluginClasspath()
-                    runner.withArguments("publishMavenPublicationToRepoRepository")
+                    runner.withArguments("publishMavenPublicationToRepublisherRepository")
                     runner.withProjectDir(dir.toFile())
                     //                println(runner.pluginClasspath)
                     /*val result =*/ runner.build()
