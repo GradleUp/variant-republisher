@@ -48,15 +48,15 @@ testing {
 }
 
 gradlePlugin {
-    website = "https://github.com/GradleUp/os-arch"
+    website = "https://github.com/GradleUp/variant-republisher"
     vcsUrl = website
     // Define the plugin
-    plugins.create("os-arch") {
-        id = "io.github.gradleUp.os-arch"
-        implementationClass = "gradleUp.OsArchPlugin"
-        displayName = "os-arch"
-        description = "Util Gradle plugin for retrieving os and arch of the underlying platform"
-        tags = listOf("os", "operating-system", "operating", "system", "arch", "architecture", "attribute")
+    plugins.create("variant-republisher") {
+        id = "io.github.gradleUp.variant-republisher"
+        implementationClass = "gradleUp.VariantRepublisherPlugin"
+        displayName = "variant-republisher"
+        description = "Gradle plugin to republish projects with native libraries to fix their Gradle Metadata support"
+        tags = listOf("native", "library", "metadata", "variant")
     }
 }
 
